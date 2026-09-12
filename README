@@ -1,0 +1,43 @@
+# 🏦 Simucred - API de Simulação de Crédito
+
+O **Simucred** é um sistema projetado para automatizar e validar o fluxo de aprovação de crédito. A API recebe dados financeiros estruturados — como perfil de renda, idade e valor solicitado — e processa essas requisições através de um motor de regras de negócio, retornando um status de concessão ágil e confiável.
+
+A arquitetura do projeto foi estruturada para solucionar gargalos comuns no ciclo de vida do software, adotando um fluxo rigoroso de desenvolvimento e operações (DevOps).
+
+### 🚀 Stack Tecnológica
+- **Backend:** Java 21 + Spring Boot 3.2
+- **Frontend:** Angular 20+ *(Em breve)*
+- **Banco de Dados:** PostgreSQL
+- **Migrações:** Flyway
+- **Infraestrutura e CI/CD:** Docker, Docker Compose, GitHub Actions
+- **Qualidade e Segurança:** SonarCloud, Trivy
+- **Observabilidade:** Prometheus, Grafana
+
+---
+
+### ⚙️ Como executar o projeto localmente
+
+**Pré-requisitos:**
+- Java 21 instalado
+- Docker e Docker Compose instalados
+
+**1. Subir a infraestrutura (Banco de Dados)**
+Na raiz do projeto, inicie o container do PostgreSQL:
+```bash
+docker-compose up -d
+```
+
+**2. Rodar a aplicação Spring Boot**
+Com o banco rodando, inicie a API utilizando o Maven Wrapper:
+
+No Windows:
+```bash
+.\mvnw spring-boot:run
+```
+No Linux/Mac:
+```bash
+./mvnw spring-boot:run
+```
+A API estará disponível em http://localhost:8080.
+
+---
