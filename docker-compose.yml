@@ -11,5 +11,20 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.0
+    container_name: simucred-keycloak
+    environment:
+      KEYCLOAK_ADMIN: ${KEY_USER}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEY_PASSWORD}
+    command: start-dev
+    ports:
+      - "8081:8080"
+    networks:
+      - simucred-network
+
 volumes:
   postgres_data:
+
+networks:
+  simucred-network:
