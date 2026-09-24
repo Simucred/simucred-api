@@ -10,6 +10,8 @@ services:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - simucred-network
 
   keycloak:
     image: quay.io/keycloak/keycloak:24.0.0
@@ -20,6 +22,24 @@ services:
     command: start-dev
     ports:
       - "8081:8080"
+    networks:
+      - simucred-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: simucred-api
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      KEYCLOAK_AUTH_SERVER_URL: http://keycloak:8080
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      - postgres
+      - keycloak
     networks:
       - simucred-network
 
