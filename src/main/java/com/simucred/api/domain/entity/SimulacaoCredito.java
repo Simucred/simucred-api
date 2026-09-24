@@ -55,4 +55,7 @@ public class SimulacaoCredito {
   @Column(nullable = false)
   private LocalDateTime dataSimulacao;
 
+  @Column(nullable = false, name = "username_usuario")
+  private String username;
+
 }

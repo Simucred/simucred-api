@@ -1,5 +1,6 @@
 CREATE TABLE simulacoes_credito (
   id UUID PRIMARY KEY,
+  username_usuario VARCHAR(255) NOT NULL,
   cpf VARCHAR(11) NOT NULL,
   nome VARCHAR(255) NOT NULL,
   idade INTEGER NOT NULL,

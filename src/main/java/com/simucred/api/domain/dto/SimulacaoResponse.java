@@ -10,7 +10,12 @@ public record SimulacaoResponse(
     UUID id,
     String cpf,
     String nome,
+    Integer idade,
+    BigDecimal rendaMensal,
     BigDecimal valorSolicitado,
+    Integer prazoMeses,
+    BigDecimal valorParcela,
+    BigDecimal taxaJurosMensal,
     StatusSimulacao status,
     String justificativaIa,
     LocalDateTime dataSimulacao) {
