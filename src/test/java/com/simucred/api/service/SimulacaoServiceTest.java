@@ -40,9 +40,9 @@ class SimulacaoServiceTest {
   @InjectMocks
   private SimulacaoService service;
 
-  private final String USERNAME = "dev.tester";
-  private final BigDecimal TAXA_JUROS = new BigDecimal("0.025");
-  private final BigDecimal LIMITE_COMPROMETIMENTO = new BigDecimal("0.30");
+  private static final String USERNAME = "dev.tester";
+  private static final BigDecimal TAXA_JUROS = new BigDecimal("0.025");
+  private static final BigDecimal LIMITE_COMPROMETIMENTO = new BigDecimal("0.30");
 
   @BeforeEach
   void setup() {
