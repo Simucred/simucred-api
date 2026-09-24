@@ -5,6 +5,7 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.Period;
+import java.time.ZoneId;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -94,7 +95,7 @@ public class SimulacaoService {
     log.info("[AUDIT] Iniciando simulação de crédito. Usuário: {}, Valor solicitado: {}, Prazo: {}",
         username, request.valorSolicitado(), request.prazoMeses());
 
-    int idade = Period.between(request.dataNascimento(), LocalDate.now()).getYears();
+    int idade = Period.between(request.dataNascimento(), LocalDate.now(ZoneId.systemDefault())).getYears();
 
     BigDecimal taxaJuros = creditoProperties.taxaJurosMensal();
     BigDecimal valorParcela = calcularParcelaPrice(request.valorSolicitado(), taxaJuros, request.prazoMeses());

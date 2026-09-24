@@ -21,6 +21,8 @@ import com.simucred.api.service.SimulacaoService;
 @RequestMapping("/v1/simulacoes")
 public class SimulacaoController {
 
+  private static final String CLAIM_PREFERRED_USERNAME = "preferred_username";
+
   private final SimulacaoService service;
 
   public SimulacaoController(SimulacaoService service) {
@@ -29,20 +31,20 @@ public class SimulacaoController {
 
   @GetMapping("/resumo")
   public ResumoSimulacao getResumo(@AuthenticationPrincipal Jwt jwt) {
-    String username = jwt.getClaimAsString("preferred_username");
+    String username = jwt.getClaimAsString(CLAIM_PREFERRED_USERNAME);
     return service.obterResumo(username);
   }
 
   @GetMapping
   public List<SimulacaoListagem> getRecentes(@AuthenticationPrincipal Jwt jwt) {
-    String username = jwt.getClaimAsString("preferred_username");
+    String username = jwt.getClaimAsString(CLAIM_PREFERRED_USERNAME);
     return service.obterRecentes(username);
   }
 
   @PostMapping
   public ResponseEntity<SimulacaoResponse> realizarSimulacao(@RequestBody SimulacaoRequest request,
       @AuthenticationPrincipal Jwt jwt) {
-    String username = jwt.getClaimAsString("preferred_username");
+    String username = jwt.getClaimAsString(CLAIM_PREFERRED_USERNAME);
     SimulacaoResponse response = service.simular(request, username);
     return ResponseEntity.ok(response);
   }
