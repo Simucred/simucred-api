@@ -18,5 +18,6 @@ public record SimulacaoResponse(
     BigDecimal taxaJurosMensal,
     StatusSimulacao status,
     String justificativaIa,
+    GraficoIaDto graficoIa,
     LocalDateTime dataSimulacao) {
 }

@@ -9,6 +9,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.simucred.api.domain.dto.AnaliseIaResponse;
 import com.simucred.api.domain.dto.ResumoSimulacao;
 import com.simucred.api.domain.dto.SimulacaoListagem;
 import com.simucred.api.domain.dto.SimulacaoRequest;
@@ -27,10 +28,15 @@ public class SimulacaoService {
 
   private final SimulacaoRepository repository;
   private final CreditoProperties creditoProperties;
+  private final GeminiService geminiService;
 
-  public SimulacaoService(SimulacaoRepository repository, CreditoProperties creditoProperties) {
+  public SimulacaoService(
+      SimulacaoRepository repository,
+      CreditoProperties creditoProperties,
+      GeminiService geminiService) {
     this.repository = repository;
     this.creditoProperties = creditoProperties;
+    this.geminiService = geminiService;
   }
 
   public ResumoSimulacao obterResumo(String username) {
@@ -59,8 +65,8 @@ public class SimulacaoService {
     double taxaAprovacao = (double) aprovadas / total * 100;
 
     BigDecimal somaValores = simulacoes.stream()
-        .map(s -> s.getValorSolicitado())
-        .reduce(BigDecimal.ZERO, (a, b) -> a.add(b));
+        .map(SimulacaoCredito::getValorSolicitado)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
     BigDecimal valorMedio = somaValores.divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
 
     log.info("[AUDIT] Resumo gerado com sucesso. Total de registros: {}, Usuário: {}", total, username);
@@ -103,13 +109,17 @@ public class SimulacaoService {
         .multiply(creditoProperties.percentualMaximoComprometimento());
 
     boolean aprovado = valorParcela.compareTo(limiteComprometimento) <= 0;
-
     StatusSimulacao status = aprovado ? StatusSimulacao.APROVADO : StatusSimulacao.REPROVADO;
-    String justificativa = aprovado
-        ? "Crédito aprovado: a renda mensal comporta a parcela estimada de R$ " + valorParcela + "."
-        : "Crédito reprovado: parcela de R$ " + valorParcela + " compromete mais de "
-            + creditoProperties.percentualMaximoComprometimento().multiply(BigDecimal.valueOf(100))
-            + "% da renda declarada.";
+
+    AnaliseIaResponse analiseIa = geminiService.interpretarSimulacao(
+        request.rendaMensal(),
+        request.valorSolicitado(),
+        request.prazoMeses(),
+        taxaJuros,
+        valorParcela,
+        status,
+        creditoProperties.percentualMaximoComprometimento()
+    );
 
     SimulacaoCredito entidade = new SimulacaoCredito();
     entidade.setCpf(request.cpf());
@@ -119,7 +129,7 @@ public class SimulacaoService {
     entidade.setValorSolicitado(request.valorSolicitado());
     entidade.setPrazoMeses(request.prazoMeses());
     entidade.setStatus(status);
-    entidade.setJustificativaIa(justificativa);
+    entidade.setJustificativaIa(analiseIa.explicacaoTexto());
     entidade.setUsername(username);
 
     SimulacaoCredito salva = repository.save(entidade);
@@ -130,7 +140,8 @@ public class SimulacaoService {
     return new SimulacaoResponse(
         salva.getId(), CpfUtil.mascararCpf(salva.getCpf()), salva.getNome(), salva.getIdade(),
         salva.getRendaMensal(), salva.getValorSolicitado(), salva.getPrazoMeses(),
-        valorParcela, taxaJuros, salva.getStatus(), salva.getJustificativaIa(), salva.getDataSimulacao());
+        valorParcela, taxaJuros, salva.getStatus(), salva.getJustificativaIa(),
+        analiseIa.grafico(), salva.getDataSimulacao());
   }
 
   private BigDecimal calcularParcelaPrice(BigDecimal valorPresente, BigDecimal taxaMensal, int numeroParcelas) {
