@@ -23,26 +23,65 @@ A IA do Simucred atua **exclusivamente como uma camada de análise**, sem autori
 ### ⚙️ Como executar o projeto localmente
 
 **Pré-requisitos:**
-- Java 21 instalado
 - Docker e Docker Compose instalados
+- Os dois repositórios clonados **lado a lado** na mesma pasta:
 
-**1. Subir a infraestrutura (Banco de Dados)**
-Na raiz do projeto, inicie o container do PostgreSQL:
-```bash
-docker-compose up -d
+```text
+pasta-qualquer/
+├── simucred-api/   ← este repositório (tem o docker-compose.yml)
+└── simucred_web/   ← front-end Angular
 ```
 
-**2. Rodar a aplicação Spring Boot**
-Com o banco rodando, inicie a API utilizando o Maven Wrapper:
+```bash
+git clone https://github.com/Simucred/simucred-api.git
+git clone https://github.com/Simucred/simucred_web.git
+```
 
-No Windows:
+**1. Criar o arquivo `.env`**
+Na raiz deste repositório, copie o modelo. Os valores padrão já funcionam para rodar localmente:
+
 ```bash
-.\mvnw spring-boot:run
+cp .env.example .env
 ```
-No Linux/Mac:
+
+No Windows (PowerShell/CMD): `copy .env.example .env`
+
+**2. Subir tudo (banco, Keycloak, API e front) com um comando**
 ```bash
-./mvnw spring-boot:run
+docker compose up -d --build
 ```
-A API estará disponível em http://localhost:8080.
+
+A ordem de subida é automática: o Postgres precisa ficar `healthy` antes da API subir, e o front sobe depois da API.
+
+**3. Conferir**
+```bash
+docker compose ps
+```
+
+Os 4 serviços devem aparecer como `Up`.
+
+| Serviço | Endereço |
+| --- | --- |
+| Front-end | http://localhost:4200 |
+| API | http://localhost:8080 (Swagger em `/swagger-ui.html`) |
+| Keycloak | http://localhost:8081 (painel admin com `KEY_USER` / `KEY_PASSWORD`) |
+
+**4. Acessar**
+Abra http://localhost:4200 e entre com o usuário de teste `analista` / `123456`, ou clique em **Register** na tela do Keycloak para criar um usuário.
+
+> O realm `simucred`, o client `simucred-web` e o usuário de teste são importados de `keycloak/realm-export.json` na primeira subida. Essas credenciais são **apenas para desenvolvimento local**.
+
+**Parar os serviços**
+```bash
+docker compose stop      # pausa, mantendo dados e usuários
+docker compose down -v   # remove tudo, inclusive o banco
+```
+
+**Subir só o backend (sem o front)**
+O front faz parte do profile `full`, ativado pela linha `COMPOSE_PROFILES=full` do `.env`. Remova essa linha para subir apenas banco, Keycloak e API (é assim que o CI roda).
+
+**Portas ocupadas?** Troque `API_PORT`, `KEY_PORT` e/ou `WEB_PORT` no `.env`. O front é configurado automaticamente para as novas portas.
+
+**Atualizou e o banco não sobe?** Se aparecer `database files are incompatible` no log do `simucred-db`, o volume foi criado com uma versão anterior do PostgreSQL. Rode `docker compose down -v` e suba de novo (os dados locais são apagados).
 
 ---
