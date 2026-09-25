@@ -2,21 +2,22 @@ name: Simucred CI/CD Pipeline
 
 on:
   pull_request:
-    branches: ["dev", "main"]
+    branches: [ "dev", "main" ]
   push:
-    branches: ["dev", "main"]
+    branches: [ "dev", "main", "infra/**", "test/**", "feature/**", "fix/**" ]
 
 jobs:
   # =========================================================================
-  # ETAPA 1: CI (Continuous Integration)
+  # ETAPA 1: CI (Integração Contínua) - Secção 5
+  # Roda testes, builda a imagem uma única vez, valida no Compose e exporta
   # =========================================================================
-  build-and-test:
-    name: "CI - Build e Testes da API"
+  ci:
+    name: "CI - Testes, Build e Validação de Container"
     runs-on: ubuntu-latest
-
+    
     services:
       postgres:
-        image: postgres:15-alpine
+        image: postgres:16-alpine
         env:
           POSTGRES_USER: simucred_user
           POSTGRES_PASSWORD: simucred_password
@@ -30,55 +31,76 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Checkout do código
+      - name: 1. Checkout do código
         uses: actions/checkout@v4
 
-      - name: Configurar JDK 21
+      - name: 2. Configurar JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: "21"
-          distribution: "temurin"
+          java-version: '21'
+          distribution: 'temurin'
           cache: maven
 
-      - name: Compilar e Testar a API
+      - name: 3. Executar Testes Automatizados (JUnit 5)
         env:
           DB_USER: simucred_user
           DB_PASSWORD: simucred_password
           DB_NAME: simucred_db
           DB_PORT: 5432
-        run: mvn clean package
+        run: ./mvnw clean test
+
+      - name: 4. Build da Imagem Docker (Sem publicar)
+        run: docker build -t app:${{ github.sha }} .
+
+      - name: 5. Validar Imagem subindo com Docker Compose
+        run: |
+          docker compose up -d
+          sleep 25
+          docker compose ps
+          docker logs simucred-api
+          # Verifica se o container da API continua de pé e saudável
+          docker inspect -f '{{.State.Running}}' simucred-api | grep -q "true"
+          docker compose down
+
+      - name: 6. Guardar imagem validada como artefato para o CD (Regra de Ouro)
+        run: docker save --output imagem.tar app:${{ github.sha }}
+
+      - name: 7. Upload do artefato da imagem
+        uses: actions/upload-artifact@v4
+        with:
+          name: imagem-docker-validada
+          path: imagem.tar
+          retention-days: 1
 
   # =========================================================================
-  # ETAPA 2: CD (Continuous Delivery)
-  # Só executa se a etapa de CI passar e for um push nas branches dev ou main
+  # ETAPA 2: CD (Entrega Contínua) - Secções 5, 6 e 7
+  # Só roda após o CI passar e apenas na branch principal (main)
+  # Reaproveita exatamente os mesmos bytes da imagem testada no CI
   # =========================================================================
-  publish-docker-hub:
-    name: "CD - Build e Push da Imagem Docker"
-    needs: build-and-test
+  cd:
+    name: "CD - Publicação no Docker Hub"
+    needs: ci
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
-      - name: Checkout do código
-        uses: actions/checkout@v4
+      - name: 1. Download da imagem validada no CI
+        uses: actions/download-artifact@v4
+        with:
+          name: imagem-docker-validada
 
-      - name: Configurar Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: 2. Carregar imagem Docker (docker load)
+        run: docker load --input imagem.tar
 
-      - name: Login no Docker Hub
+      - name: 3. Login no Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build e Push da Imagem para o Docker Hub
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/simucred-api:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/simucred-api:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: 4. Tag e Push da imagem no Docker Hub
+        run: |
+          docker tag app:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/simucred-api:${{ github.sha }}
+          docker tag app:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/simucred-api:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/simucred-api:${{ github.sha }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/simucred-api:latest

@@ -32,10 +32,7 @@ services:
       - simucred-net
 
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: simucred-api:local
+    image: alezzin/simucred-api:latest
     container_name: simucred-api
     ports:
       - "${API_PORT:-8080}:8080"
