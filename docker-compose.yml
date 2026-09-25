@@ -57,6 +57,28 @@ services:
     networks:
       - simucred-net
 
+  # Front-end Angular (repositório simucred_web, clonado ao lado deste).
+  # Fica no profile "full" para o CI da API continuar subindo só banco, Keycloak e API.
+  web:
+    profiles: ["full"]
+    build:
+      context: ${WEB_PATH:-../simucred_web/simucred}
+      dockerfile: Dockerfile
+    image: simucred-web:local
+    container_name: simucred-web
+    ports:
+      - "${WEB_PORT:-4200}:4000"
+    environment:
+      # URLs acessadas pelo navegador, por isso apontam para o localhost
+      URL_API: http://localhost:${API_PORT:-8080}/v1
+      KEYCLOAK_URL: http://localhost:${KEY_PORT:-8081}
+      KEYCLOAK_REALM: simucred
+      KEYCLOAK_CLIENT_ID: simucred-web
+    depends_on:
+      - api
+    networks:
+      - simucred-net
+
 volumes:
   postgres_data:
 
