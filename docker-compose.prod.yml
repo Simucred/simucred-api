@@ -45,12 +45,33 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-simucred}
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-postgrespassword}
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/simucred/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/${KEY_REALM:-simucred}/protocol/openid-connect/certs
     depends_on:
       postgres:
         condition: service_healthy
       keycloak:
         condition: service_started
+    networks:
+      - simucred-net
+
+  # Front-end Angular (opcional - sobe apenas quando chamado com --profile full)
+  web:
+    profiles: ["full"]
+    build:
+      context: ${WEB_PATH:-../simucred_web/simucred}
+      dockerfile: Dockerfile
+    image: simucred-web:local
+    container_name: simucred-web
+    ports:
+      - "${WEB_PORT:-4200}:4000"
+    environment:
+      URL_API: http://localhost:${API_PORT:-8080}/v1
+      KEYCLOAK_URL: http://localhost:${KEY_PORT:-8081}
+      KEYCLOAK_REALM: ${KEY_REALM:-simucred}
+      KEYCLOAK_CLIENT_ID: ${KEY_CLIENT_ID:-simucred-web}
+    depends_on:
+      api:
+        condition: service_healthy
     networks:
       - simucred-net
 

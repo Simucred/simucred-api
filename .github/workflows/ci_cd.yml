@@ -19,9 +19,9 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: simucred_user
-          POSTGRES_PASSWORD: simucred_password
-          POSTGRES_DB: simucred_db
+          POSTGRES_USER: ${{ secrets.DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.DB_NAME }}
         ports:
           - 5432:5432
         options: >-
@@ -43,16 +43,25 @@ jobs:
 
       - name: 3. Executar Testes Automatizados (JUnit 5)
         env:
-          DB_USER: simucred_user
-          DB_PASSWORD: simucred_password
-          DB_NAME: simucred_db
+          DB_HOST: localhost
           DB_PORT: 5432
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: ./mvnw clean test
 
       - name: 4. Build da Imagem Docker (Sem publicar)
         run: docker build -t app:${{ github.sha }} .
 
       - name: 5. Validar Imagem subindo com Docker Compose
+        env:
+          DB_HOST: postgres
+          DB_PORT: 5432
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          KEY_USER: ${{ secrets.KEY_USER }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           docker compose up -d
           sleep 25
