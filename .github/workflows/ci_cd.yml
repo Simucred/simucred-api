@@ -13,7 +13,7 @@ jobs:
   # =========================================================================
   ci:
     name: "CI - Testes, Build e Validação de Container"
-    runs-on: self-hosted
+    runs-on: [self-hosted, linux]
     
     services:
       postgres:
