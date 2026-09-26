@@ -22,7 +22,8 @@ public class SecurityConfigurations {
     try {
       return http
           .cors(Customizer.withDefaults())
-          .csrf(csrf -> csrf.disable()) // CSRF desabilitado com segurança: API stateless via JWT
+          //noinspection SpringSecurityCsrfProtectionDisabled -- API stateless via JWT, sem sessão/cookie
+          .csrf(csrf -> csrf.disable())
           .authorizeHttpRequests(req -> {
             req.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
             req.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/v1/swagger").permitAll();
