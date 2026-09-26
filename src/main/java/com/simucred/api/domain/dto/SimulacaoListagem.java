@@ -9,6 +9,8 @@ public record SimulacaoListagem(
         LocalDateTime dataSimulacao,
         BigDecimal valorSolicitado,
         Integer prazoMeses,
+        BigDecimal valorParcela,
+        BigDecimal taxaJurosMensal,
         String status,
         String nome,
         String cpf,

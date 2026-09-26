@@ -37,6 +37,9 @@ class SimulacaoServiceTest {
   @Mock
   private CreditoProperties creditoProperties;
 
+  @Mock
+  private GeminiIntegrationService geminiService;
+
   @InjectMocks
   private SimulacaoService service;
 
@@ -151,7 +154,7 @@ class SimulacaoServiceTest {
 
     assertEquals(StatusSimulacao.APROVADO, response.status());
     assertEquals(new BigDecimal("974.87"), response.valorParcela());
-    assertTrue(response.justificativaIa().contains("comporta a parcela estimada de R$ 974.87"));
+    assertTrue(response.justificativaIa().contains("a parcela de R$ 974.87 compromete"));
   }
 
   @Test
@@ -171,7 +174,7 @@ class SimulacaoServiceTest {
 
     assertEquals(StatusSimulacao.REPROVADO, response.status());
     assertEquals(new BigDecimal("974.87"), response.valorParcela());
-    assertTrue(response.justificativaIa().contains("compromete mais de 30.00% da renda"));
+    assertTrue(response.justificativaIa().contains("acima do limite permitido de 30.00%"));
   }
 
   @Test
@@ -233,6 +236,7 @@ class SimulacaoServiceTest {
     s.setDataSimulacao(LocalDateTime.now());
     s.setNome("Mock");
     s.setCpf("00000000000");
+    s.setPrazoMeses(12);
     return s;
   }
 
