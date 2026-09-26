@@ -154,7 +154,7 @@ class SimulacaoServiceTest {
 
     assertEquals(StatusSimulacao.APROVADO, response.status());
     assertEquals(new BigDecimal("974.87"), response.valorParcela());
-    assertTrue(response.justificativaIa().contains("comporta a parcela estimada de R$ 974.87"));
+    assertTrue(response.justificativaIa().contains("a parcela de R$ 974.87 compromete"));
   }
 
   @Test
@@ -236,6 +236,7 @@ class SimulacaoServiceTest {
     s.setDataSimulacao(LocalDateTime.now());
     s.setNome("Mock");
     s.setCpf("00000000000");
+    s.setPrazoMeses(12);
     return s;
   }
 
