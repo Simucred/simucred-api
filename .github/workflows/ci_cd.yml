@@ -131,3 +131,52 @@ jobs:
           docker tag app:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/simucred-api:latest
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/simucred-api:${{ github.sha }}
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/simucred-api:latest
+
+  # =========================================================================
+  # ETAPA 3: Deploy no ambiente local (runner self-hosted)
+  # Depois que o CD publica a imagem, sobe a aplicação completa na máquina do
+  # runner a partir das imagens do Docker Hub (docker-compose.prod.yml).
+  # A aplicação fica acessível em http://localhost:4200 nessa máquina.
+  # =========================================================================
+  deploy:
+    name: "Deploy - Ambiente local (runner)"
+    needs: cd
+    runs-on: [self-hosted, linux]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    env:
+      COMPOSE_PROJECT_NAME: simucred-prod
+      CONTAINER_PREFIX: simucred-prod
+      # Usa exatamente a imagem publicada neste pipeline (rastreável pelo sha)
+      API_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/simucred-api:${{ github.sha }}
+      DB_NAME: ${{ secrets.DB_NAME }}
+      DB_USER: ${{ secrets.DB_USER }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      KEY_USER: ${{ secrets.KEY_USER }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+    steps:
+      - name: 1. Checkout do código (docker-compose.prod.yml e realm do Keycloak)
+        uses: actions/checkout@v4
+
+      - name: 2. Baixar as imagens publicadas no Docker Hub
+        run: docker compose -f docker-compose.prod.yml pull
+
+      - name: 3. Subir a aplicação
+        run: docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+      - name: 4. Verificar se a aplicação está respondendo
+        run: |
+          for i in $(seq 1 30); do
+            FRONT=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4200/ || true)
+            API=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/v1/simulacoes || true)
+            if [ "$FRONT" = "200" ] && [ "$API" = "401" ]; then
+              echo "Front respondeu 200 e API respondeu 401 (no ar e protegida) após $((i * 5))s"
+              break
+            fi
+            sleep 5
+          done
+          docker compose -f docker-compose.prod.yml ps
+          curl -sf -o /dev/null http://localhost:4200/
+          test "$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/v1/simulacoes)" = "401"
+          echo "Aplicação no ar: http://localhost:4200"
