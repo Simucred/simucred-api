@@ -14,21 +14,9 @@ jobs:
   ci:
     name: "CI - Testes, Build e Validação de Container"
     runs-on: [self-hosted, linux]
-    
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: ${{ secrets.DB_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.DB_NAME }}
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    # Sem "services:" aqui! O Docker Compose gerencia todo o stack (postgres,
+    # keycloak e api) para evitar conflito de porta 5432 entre o serviço GHA
+    # e o container do compose rodando no mesmo host.
 
     steps:
       - name: 1. Checkout do código
@@ -41,7 +29,21 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: 3. Executar Testes Automatizados (JUnit 5)
+      - name: 3. Subir banco para testes (via Docker Compose)
+        env:
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          KEY_USER: ${{ secrets.KEY_USER }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          # Sobe só o postgres para os testes Maven (sem api/keycloak ainda)
+          docker compose up -d postgres
+          # Aguarda o healthcheck passar antes de rodar os testes
+          docker compose exec -T postgres sh -c \
+            'until pg_isready -U $POSTGRES_USER -d $POSTGRES_DB; do sleep 1; done'
+
+      - name: 4. Executar Testes Automatizados (JUnit 5)
         env:
           DB_HOST: localhost
           DB_PORT: 5432
@@ -50,10 +52,10 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: ./mvnw clean test
 
-      - name: 4. Build da Imagem Docker (Sem publicar)
+      - name: 5. Build da Imagem Docker (Sem publicar)
         run: docker build -t app:${{ github.sha }} .
 
-      - name: 5. Validar Imagem subindo com Docker Compose
+      - name: 6. Validar Imagem subindo com Docker Compose
         env:
           DB_HOST: postgres
           DB_PORT: 5432
@@ -63,7 +65,7 @@ jobs:
           KEY_USER: ${{ secrets.KEY_USER }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          # Sobe só o backend: o front é validado no pipeline do simucred_web
+          # Sobe todo o backend (postgres já está rodando, compose reutiliza)
           docker compose up -d postgres keycloak api
           sleep 25
           docker compose ps
@@ -72,10 +74,10 @@ jobs:
           docker inspect -f '{{.State.Running}}' simucred-api | grep -q "true"
           docker compose down
 
-      - name: 6. Guardar imagem validada como artefato para o CD (Regra de Ouro)
+      - name: 7. Guardar imagem validada como artefato para o CD (Regra de Ouro)
         run: docker save --output imagem.tar app:${{ github.sha }}
 
-      - name: 7. Upload do artefato da imagem
+      - name: 8. Upload do artefato da imagem
         uses: actions/upload-artifact@v4
         with:
           name: imagem-docker-validada
