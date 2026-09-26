@@ -27,7 +27,7 @@ A segurança da API é baseada no protocolo **OAuth2 / OpenID Connect (OIDC)** u
 1. **`simucred-db` (PostgreSQL 16):** Banco de dados isolado na rede interna (`5432/tcp`), com volume nomeado (`postgres_data`) para persistência de dados e `healthcheck` nativo (`pg_isready`).
 2. **`simucred-keycloak` (Keycloak 24):** Servidor de autorização que importa automaticamente o realm `simucred` na inicialização (`--import-realm`), exposto na porta `8081`.
 3. **`simucred-api` (Spring Boot):** API RESTful executada sob usuário não-root (`appuser`), aguardando a saúde do banco (`service_healthy`) e exposta na porta `8080`.
-4. **`simucred-web` (Angular - Opcional via Profile `full`):** Aplicação front-end consumidora da API e do Keycloak, exposta na porta `4200`.
+4. **`simucred-web` (Angular):** Aplicação front-end consumidora da API e do Keycloak, exposta na porta `4200`.
 
 ---
 
@@ -47,22 +47,20 @@ O projeto foi configurado com valores padrão (*fallback*) em todas as variávei
 
 ```bash
 # 1. Clone o repositório
-git clone <URL_DO_REPOSITORIO>
-cd api
+git clone https://github.com/Simucred/simucred-api.git
+cd simucred-api
 
-# 2. Suba toda a infraestrutura do back-end (Banco + Keycloak + API) construindo a imagem localmente
+# 2. Suba tudo (Banco + Keycloak + API + Front-end) construindo as imagens localmente
 docker compose up -d --build
 
 # 3. Verifique o estado e a saúde (healthy) dos containers
 docker compose ps
 ```
 
-### Subindo com o Front-end Angular (Opcional)
-Caso o repositório do front-end (`simucred_web`) esteja clonado ao lado deste repositório, utilize o profile `full` para subir os 4 serviços simultaneamente:
+Os 4 serviços sobem juntos. O front-end é construído **direto do repositório [`simucred_web`](https://github.com/Simucred/simucred_web)** no GitHub (branch `main`), sem precisar cloná-lo. Para construir o front a partir de uma cópia local, defina `WEB_PATH` no `.env` (ex.: `WEB_PATH=../simucred_web/simucred`).
 
-```bash
-docker compose --profile full up -d --build
-```
+### Acessando a aplicação
+Abra http://localhost:4200. Na tela de login do Keycloak, clique em **Register** para criar um usuário (o cadastro está liberado no realm `simucred`, importado automaticamente de `keycloak/realm-export.json`).
 
 ### Comandos Úteis de Gerenciamento
 ```bash
@@ -79,15 +77,19 @@ docker compose down -v
 ---
 
 ## 5. Como Executar a Imagem Publicada no Docker Hub (Produção)
-A imagem oficial validada pelo pipeline de CI/CD encontra-se publicada publicamente no Docker Hub:
-* **Repositório no Docker Hub:** [`alezzin/simucred-api`](https://hub.docker.com/r/alezzin/simucred-api)
-* **Imagem:** `alezzin/simucred-api:latest`
+As imagens oficiais validadas pelos pipelines de CI/CD estão publicadas publicamente no Docker Hub:
 
-Para executar o ambiente utilizando diretamente a imagem pronta da nuvem (sem necessidade de compilar o código localmente), utilize o arquivo `docker-compose.prod.yml`:
+| Serviço | Imagem | Publicada por |
+| --- | --- | --- |
+| API | [`alezzin/simucred-api:latest`](https://hub.docker.com/r/alezzin/simucred-api) | CD deste repositório |
+| Front-end | [`alezzin/simucred-web:latest`](https://hub.docker.com/r/alezzin/simucred-web) | CD do repositório `simucred_web` |
+
+Para executar o ambiente utilizando diretamente as imagens prontas (sem compilar nada localmente), utilize o arquivo `docker-compose.prod.yml`:
 
 ```bash
-# 1. Baixar a imagem diretamente do Docker Hub (teste de visibilidade pública)
+# 1. Baixar as imagens diretamente do Docker Hub (teste de visibilidade pública)
 docker pull alezzin/simucred-api:latest
+docker pull alezzin/simucred-web:latest
 
 # 2. Subir o ambiente completo utilizando a imagem publicada
 docker compose -f docker-compose.prod.yml up -d
@@ -110,7 +112,7 @@ Após iniciar os containers, aguarde cerca de 20 a 30 segundos e valide os servi
 * **API Base URL:** `http://localhost:8080/v1`
 * **Keycloak Admin Console:** `http://localhost:8081`
 * **Keycloak Realm Endpoint (Importado Automaticamente):** `http://localhost:8081/realms/simucred`
-* **Front-end Web (quando iniciado com `--profile full`):** `http://localhost:4200`
+* **Front-end Web:** `http://localhost:4200`
 
 ---
 
@@ -149,8 +151,8 @@ cp .env.example .env
 | `KEY_REALM` | Nome do Realm OAuth2/OIDC importado no Keycloak | `simucred` |
 | `KEY_CLIENT_ID` | Client ID configurado no Keycloak para o front-end | `simucred-web` |
 | `API_PORT` | Porta exposta no host para acesso à API Spring Boot | `8080` |
-| `WEB_PORT` | Porta exposta no host para o front-end Angular (Profile `full`) | `4200` |
-| `WEB_PATH` | Caminho relativo para o contexto de build do front-end | `../simucred_web/simucred` |
+| `WEB_PORT` | Porta exposta no host para o front-end Angular | `4200` |
+| `WEB_PATH` | (Opcional) Contexto de build do front-end. Padrão: repositório `simucred_web` no GitHub (branch `main`) | `../simucred_web/simucred` |
 
 ---
 
