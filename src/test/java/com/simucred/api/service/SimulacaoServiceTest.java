@@ -37,6 +37,9 @@ class SimulacaoServiceTest {
   @Mock
   private CreditoProperties creditoProperties;
 
+  @Mock
+  private GeminiIntegrationService geminiService;
+
   @InjectMocks
   private SimulacaoService service;
 
@@ -171,7 +174,7 @@ class SimulacaoServiceTest {
 
     assertEquals(StatusSimulacao.REPROVADO, response.status());
     assertEquals(new BigDecimal("974.87"), response.valorParcela());
-    assertTrue(response.justificativaIa().contains("compromete mais de 30.00% da renda"));
+    assertTrue(response.justificativaIa().contains("acima do limite permitido de 30.00%"));
   }
 
   @Test
