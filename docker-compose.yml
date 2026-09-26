@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: simucred-db
+    container_name: ${CONTAINER_PREFIX:-simucred}-db
     environment:
       POSTGRES_DB: ${DB_NAME:-simucred}
       POSTGRES_USER: ${DB_USER:-postgres}
@@ -18,7 +18,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:24.0.5
-    container_name: simucred-keycloak
+    container_name: ${CONTAINER_PREFIX:-simucred}-keycloak
     command: start-dev --import-realm
     environment:
       KEYCLOAK_ADMIN: ${KEY_USER:-admin}
@@ -36,7 +36,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: simucred-api:local
-    container_name: simucred-api
+    container_name: ${CONTAINER_PREFIX:-simucred}-api
     ports:
       - "${API_PORT:-8080}:8080"
     environment:
@@ -67,7 +67,7 @@ services:
       context: ${WEB_PATH:-https://github.com/Simucred/simucred_web.git#main:simucred}
       dockerfile: Dockerfile
     image: simucred-web:local
-    container_name: simucred-web
+    container_name: ${CONTAINER_PREFIX:-simucred}-web
     ports:
       - "${WEB_PORT:-4200}:4000"
     environment:
