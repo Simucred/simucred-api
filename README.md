@@ -203,16 +203,32 @@ Os testes unitários e de integração foram desenvolvidos com **JUnit 5**. O te
 ---
 
 ## 9. Pipeline de CI/CD (GitHub Actions)
-O fluxo de Integração e Entrega Contínua está definido em `.github/workflows/ci_cd.yml`, dividido em dois jobs estritamente separados e integrados ao cofre de **GitHub Secrets**. As execuções ficam na aba **Actions** do repositório.
+O fluxo de Integração e Entrega Contínua está definido em `.github/workflows/ci_cd.yml`, dividido em três jobs separados e integrados ao cofre de **GitHub Secrets**. As execuções ficam na aba **Actions** do repositório.
+
+```text
+push / PR ──> ci (runner) ──> cd (nuvem, só na main) ──> deploy (runner, só na main)
+              testes, build     publica no Docker Hub     sobe a aplicação em localhost
+```
+
+O `ci` e o `deploy` rodam em um **runner self-hosted** (`[self-hosted, linux]`), ou seja, numa máquina da equipe registrada no GitHub Actions. Para não se atrapalharem na mesma máquina, cada um usa um projeto do Compose próprio (`COMPOSE_PROJECT_NAME`) e um prefixo de containers próprio (`CONTAINER_PREFIX`), com containers e volumes separados:
+
+| Job | Projeto | Containers | Portas no host |
+| --- | --- | --- | --- |
+| `ci` | `simucred-ci` | `simucred-ci-db`, `simucred-ci-keycloak`, `simucred-ci-api` | API `18080`, Keycloak `18081` |
+| `deploy` | `simucred-prod` | `simucred-prod-db`, `simucred-prod-keycloak`, `simucred-prod-api`, `simucred-prod-web` | API `8080`, Keycloak `8081`, Front `4200` |
+
+Rodando o Compose manualmente (sem `CONTAINER_PREFIX`), os containers se chamam `simucred-db`, `simucred-keycloak`, `simucred-api` e `simucred-web`.
 
 ### Etapa 1: `ci` (Integração Contínua)
-Disparada em `push` nas branches `dev`, `main`, `infra/**`, `feature/**`, `fix/**` e `test/**`, e em `Pull Requests` para `dev` e `main`. Roda em um **runner self-hosted** (`[self-hosted, linux]`), ou seja, numa máquina da equipe registrada no GitHub Actions:
-1. **Checkout e Setup do JDK 21** (Eclipse Temurin com cache de dependências do Maven).
-2. **Banco para os testes:** sobe o `postgres` pelo Docker Compose e aguarda o `pg_isready`.
-3. **Execução dos Testes Automatizados (`./mvnw clean test`).**
-4. **Build Único da Imagem Docker:** constrói a imagem `app:${{ github.sha }}` a partir do `Dockerfile`.
-5. **Validação com Docker Compose:** executa `docker compose up -d postgres keycloak api`, aguarda a subida, exibe os logs e verifica se o container `simucred-api` permanece em execução (`Running`).
-6. **Exportação do Artefato (Regra de Ouro):** salva a imagem validada (`docker save --output imagem.tar`) e faz upload como artefato (`imagem-docker-validada`) para que o CD não reconstrua a imagem do zero.
+Disparada em `push` nas branches `dev`, `main`, `infra/**`, `feature/**`, `fix/**` e `test/**`, e em `Pull Requests` para `dev` e `main`:
+1. **Checkout e limpeza** de containers de execuções anteriores do CI.
+2. **Setup do JDK 21** (Eclipse Temurin com cache de dependências do Maven).
+3. **Banco para os testes:** sobe o `postgres` pelo Docker Compose e aguarda o `pg_isready`.
+4. **Execução dos Testes Automatizados (`./mvnw clean test`).**
+5. **Build Único da Imagem Docker:** constrói a imagem `app:${{ github.sha }}` a partir do `Dockerfile`.
+6. **Validação com Docker Compose:** executa `docker compose up -d postgres keycloak api`, aguarda a subida, exibe os logs e verifica se o container `simucred-ci-api` permanece em execução (`Running`).
+7. **Exportação do Artefato (Regra de Ouro):** salva a imagem validada (`docker save --output imagem.tar`) e faz upload como artefato (`imagem-docker-validada`) para que o CD não reconstrua a imagem do zero.
+8. **Limpeza final** (`if: always()`): derruba os containers e o volume do CI mesmo se algum passo falhar.
 
 ### Etapa 2: `cd` (Entrega Contínua)
 Executada **exclusivamente após o sucesso do job de CI** (`needs: ci`) e **somente em eventos de `push` (merge) na branch principal `main`**:
@@ -220,6 +236,15 @@ Executada **exclusivamente após o sucesso do job de CI** (`needs: ci`) e **some
 2. Carrega exatamente os mesmos bytes da imagem testada via `docker load --input imagem.tar`.
 3. Autentica no Docker Hub utilizando os segredos `DOCKERHUB_USERNAME` e `DOCKERHUB_TOKEN`.
 4. Aplica as tags `:latest` e `:${{ github.sha }}` e publica a imagem em `alezzin/simucred-api`.
+
+### Etapa 3: `deploy` (ambiente local no runner)
+Executada **após o sucesso do CD** (`needs: cd`) e **somente em `push` na `main`**, no runner self-hosted:
+1. Faz checkout do repositório (para ter o `docker-compose.prod.yml` e o realm do Keycloak).
+2. Baixa as imagens publicadas (`docker compose -f docker-compose.prod.yml pull`), usando para a API **exatamente a tag do commit** publicada pelo CD (`API_IMAGE=alezzin/simucred-api:<sha>`).
+3. Sobe a aplicação (`docker compose -f docker-compose.prod.yml up -d`), com o banco configurado pelos GitHub Secrets.
+4. Verifica se o front responde (`200` em `http://localhost:4200`) e se a API responde (`401` sem token em `http://localhost:8080/v1/simulacoes`).
+
+Depois de cada merge na `main`, a aplicação fica no ar em **http://localhost:4200** na máquina do runner, com a versão recém-publicada. O banco (`simucred-prod_postgres_data`) é mantido entre os deploys.
 
 ---
 
@@ -247,6 +272,8 @@ cp .env.example .env
 | `API_PORT` | Porta exposta no host para acesso à API Spring Boot | `8080` |
 | `WEB_PORT` | Porta exposta no host para o front-end Angular | `4200` |
 | `WEB_PATH` | (Opcional) Contexto de build do front-end. Padrão: repositório `simucred_web` no GitHub (branch `main`) | `../simucred_web/simucred` |
+| `CONTAINER_PREFIX` | (Opcional) Prefixo dos nomes dos containers. O pipeline usa `simucred-ci` e `simucred-prod` | `simucred` |
+| `API_IMAGE` | (Opcional, só no `docker-compose.prod.yml`) Imagem da API a executar | `alezzin/simucred-api:latest` |
 
 ---
 
