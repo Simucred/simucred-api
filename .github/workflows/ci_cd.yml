@@ -18,9 +18,20 @@ jobs:
     # keycloak e api) para evitar conflito de porta 5432 entre o serviço GHA
     # e o container do compose rodando no mesmo host.
 
+    # O CI roda na mesma máquina do deploy: projeto, containers e portas próprios
+    # para nunca tocar na aplicação que está no ar (simucred-prod).
+    env:
+      COMPOSE_PROJECT_NAME: simucred-ci
+      CONTAINER_PREFIX: simucred-ci
+      API_PORT: 18080
+      KEY_PORT: 18081
+
     steps:
       - name: 1. Checkout do código
         uses: actions/checkout@v4
+
+      - name: Limpar containers de execuções anteriores do CI
+        run: docker compose down -v --remove-orphans || true
 
       - name: 2. Configurar JDK 21
         uses: actions/setup-java@v4
@@ -69,10 +80,9 @@ jobs:
           docker compose up -d postgres keycloak api
           sleep 25
           docker compose ps
-          docker logs simucred-api
+          docker logs simucred-ci-api
           # Verifica se o container da API continua de pé e saudável
-          docker inspect -f '{{.State.Running}}' simucred-api | grep -q "true"
-          docker compose down
+          docker inspect -f '{{.State.Running}}' simucred-ci-api | grep -q "true"
 
       - name: 7. Guardar imagem validada como artefato para o CD (Regra de Ouro)
         run: docker save --output imagem.tar app:${{ github.sha }}
@@ -83,6 +93,11 @@ jobs:
           name: imagem-docker-validada
           path: imagem.tar
           retention-days: 1
+
+      # Roda mesmo se algum passo falhar, para não deixar containers do CI na máquina
+      - name: Derrubar containers do CI
+        if: always()
+        run: docker compose down -v --remove-orphans
 
   # =========================================================================
   # ETAPA 2: CD (Entrega Contínua) - Secções 5, 6 e 7
