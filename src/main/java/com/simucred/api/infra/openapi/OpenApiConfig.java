@@ -11,6 +11,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfig {
 
+    private static final String SECURITY_SCHEME_NAME = "bearer-jwt";
+
   @Bean
   public OpenAPI customOpenAPI() {
     return new OpenAPI()
@@ -18,10 +20,10 @@ public class OpenApiConfig {
             .title("Simucred API")
             .description("API para simulação de crédito B2C")
             .version("v1"))
-        .addSecurityItem(new SecurityRequirement().addList("bearer-jwt"))
+        .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME_NAME))
         .components(new Components()
-            .addSecuritySchemes("bearer-jwt", new SecurityScheme()
-                .name("bearer-jwt")
+            .addSecuritySchemes(SECURITY_SCHEME_NAME, new SecurityScheme()
+                .name(SECURITY_SCHEME_NAME)
                 .type(SecurityScheme.Type.HTTP)
                 .scheme("bearer")
                 .bearerFormat("JWT")));
