@@ -84,10 +84,14 @@ jobs:
           # Verifica se o container da API continua de pé e saudável
           docker inspect -f '{{.State.Running}}' simucred-ci-api | grep -q "true"
 
+      # O artefato só é usado pelo CD, que só roda em push na main.
+      # Em PRs e nas outras branches, pula o save/upload (~200 MB) e o CI termina mais rápido.
       - name: 7. Guardar imagem validada como artefato para o CD (Regra de Ouro)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: docker save --output imagem.tar app:${{ github.sha }}
 
       - name: 8. Upload do artefato da imagem
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: imagem-docker-validada

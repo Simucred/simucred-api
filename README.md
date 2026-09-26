@@ -227,7 +227,7 @@ Disparada em `push` nas branches `dev`, `main`, `infra/**`, `feature/**`, `fix/*
 4. **Execução dos Testes Automatizados (`./mvnw clean test`).**
 5. **Build Único da Imagem Docker:** constrói a imagem `app:${{ github.sha }}` a partir do `Dockerfile`.
 6. **Validação com Docker Compose:** executa `docker compose up -d postgres keycloak api`, aguarda a subida, exibe os logs e verifica se o container `simucred-ci-api` permanece em execução (`Running`).
-7. **Exportação do Artefato (Regra de Ouro):** salva a imagem validada (`docker save --output imagem.tar`) e faz upload como artefato (`imagem-docker-validada`) para que o CD não reconstrua a imagem do zero.
+7. **Exportação do Artefato (Regra de Ouro), só em push na `main`:** salva a imagem validada (`docker save --output imagem.tar`) e faz upload como artefato (`imagem-docker-validada`) para que o CD não reconstrua a imagem do zero.
 8. **Limpeza final** (`if: always()`): derruba os containers e o volume do CI mesmo se algum passo falhar.
 
 ### Etapa 2: `cd` (Entrega Contínua)
