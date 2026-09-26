@@ -18,5 +18,7 @@ public record SimulacaoResponse(
     BigDecimal taxaJurosMensal,
     StatusSimulacao status,
     String justificativaIa,
-    LocalDateTime dataSimulacao) {
+    LocalDateTime dataSimulacao,
+    GeminiAnaliseResponse analiseIA) {
 }
+
