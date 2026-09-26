@@ -1,0 +1,115 @@
+name: Simucred CI/CD Pipeline
+
+on:
+  pull_request:
+    branches: [ "dev", "main" ]
+  push:
+    branches: [ "dev", "main", "infra/**", "test/**", "feature/**", "fix/**" ]
+
+jobs:
+  # =========================================================================
+  # ETAPA 1: CI (Integração Contínua) - Secção 5
+  # Roda testes, builda a imagem uma única vez, valida no Compose e exporta
+  # =========================================================================
+  ci:
+    name: "CI - Testes, Build e Validação de Container"
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ${{ secrets.DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.DB_NAME }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: 1. Checkout do código
+        uses: actions/checkout@v4
+
+      - name: 2. Configurar JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: 3. Executar Testes Automatizados (JUnit 5)
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: ./mvnw clean test
+
+      - name: 4. Build da Imagem Docker (Sem publicar)
+        run: docker build -t app:${{ github.sha }} .
+
+      - name: 5. Validar Imagem subindo com Docker Compose
+        env:
+          DB_HOST: postgres
+          DB_PORT: 5432
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          KEY_USER: ${{ secrets.KEY_USER }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          docker compose up -d
+          sleep 25
+          docker compose ps
+          docker logs simucred-api
+          # Verifica se o container da API continua de pé e saudável
+          docker inspect -f '{{.State.Running}}' simucred-api | grep -q "true"
+          docker compose down
+
+      - name: 6. Guardar imagem validada como artefato para o CD (Regra de Ouro)
+        run: docker save --output imagem.tar app:${{ github.sha }}
+
+      - name: 7. Upload do artefato da imagem
+        uses: actions/upload-artifact@v4
+        with:
+          name: imagem-docker-validada
+          path: imagem.tar
+          retention-days: 1
+
+  # =========================================================================
+  # ETAPA 2: CD (Entrega Contínua) - Secções 5, 6 e 7
+  # Só roda após o CI passar e apenas na branch principal (main)
+  # Reaproveita exatamente os mesmos bytes da imagem testada no CI
+  # =========================================================================
+  cd:
+    name: "CD - Publicação no Docker Hub"
+    needs: ci
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: 1. Download da imagem validada no CI
+        uses: actions/download-artifact@v4
+        with:
+          name: imagem-docker-validada
+
+      - name: 2. Carregar imagem Docker (docker load)
+        run: docker load --input imagem.tar
+
+      - name: 3. Login no Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 4. Tag e Push da imagem no Docker Hub
+        run: |
+          docker tag app:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/simucred-api:${{ github.sha }}
+          docker tag app:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/simucred-api:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/simucred-api:${{ github.sha }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/simucred-api:latest
