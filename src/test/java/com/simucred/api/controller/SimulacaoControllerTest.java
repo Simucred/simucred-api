@@ -75,6 +75,8 @@ class SimulacaoControllerTest {
         LocalDateTime.now(),
         new BigDecimal("10000.00"),
         24,
+        new BigDecimal("650.00"),
+        new BigDecimal("0.025"),
         StatusSimulacao.APROVADO.name(),
         "Maria",
         "123.456.789-00",
@@ -117,7 +119,8 @@ class SimulacaoControllerTest {
         new BigDecimal("0.025"),
         StatusSimulacao.APROVADO,
         "Aprovado",
-        LocalDateTime.now());
+        LocalDateTime.now(),
+        null);
 
     when(service.simular(
         any(SimulacaoRequest.class),

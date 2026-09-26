@@ -10,6 +10,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.simucred.api.domain.dto.GeminiAnaliseResponse;
 import com.simucred.api.domain.dto.ResumoSimulacao;
 import com.simucred.api.domain.dto.SimulacaoListagem;
 import com.simucred.api.domain.dto.SimulacaoRequest;
@@ -28,10 +29,14 @@ public class SimulacaoService {
 
   private final SimulacaoRepository repository;
   private final CreditoProperties creditoProperties;
+  private final GeminiIntegrationService geminiService;
 
-  public SimulacaoService(SimulacaoRepository repository, CreditoProperties creditoProperties) {
+  public SimulacaoService(SimulacaoRepository repository,
+      CreditoProperties creditoProperties,
+      GeminiIntegrationService geminiService) {
     this.repository = repository;
     this.creditoProperties = creditoProperties;
+    this.geminiService = geminiService;
   }
 
   public ResumoSimulacao obterResumo(String username) {
@@ -79,6 +84,8 @@ public class SimulacaoService {
             s.getDataSimulacao(),
             s.getValorSolicitado(),
             s.getPrazoMeses(),
+            calcularParcelaPrice(s.getValorSolicitado(), creditoProperties.taxaJurosMensal(), s.getPrazoMeses()),
+            creditoProperties.taxaJurosMensal(),
             s.getStatus().name(),
             s.getNome(),
             s.getCpf(),
@@ -106,11 +113,18 @@ public class SimulacaoService {
     boolean aprovado = valorParcela.compareTo(limiteComprometimento) <= 0;
 
     StatusSimulacao status = aprovado ? StatusSimulacao.APROVADO : StatusSimulacao.REPROVADO;
+    BigDecimal percentualComprometimento = valorParcela
+        .divide(request.rendaMensal(), 6, RoundingMode.HALF_UP)
+        .multiply(BigDecimal.valueOf(100));
+    BigDecimal limitePercentual = creditoProperties.percentualMaximoComprometimento()
+        .multiply(BigDecimal.valueOf(100));
     String justificativa = aprovado
-        ? "Crédito aprovado: a renda mensal comporta a parcela estimada de R$ " + valorParcela + "."
-        : "Crédito reprovado: parcela de R$ " + valorParcela + " compromete mais de "
-            + creditoProperties.percentualMaximoComprometimento().multiply(BigDecimal.valueOf(100))
-            + "% da renda declarada.";
+        ? String.format("Crédito aprovado: a parcela de R$ %s compromete %s%% da renda e está dentro do limite de %s%%.",
+            valorParcela.toPlainString(), percentualComprometimento.setScale(2, RoundingMode.HALF_UP).toPlainString(),
+            limitePercentual.setScale(2, RoundingMode.HALF_UP).toPlainString())
+        : String.format("Crédito não aprovado porque a parcela de R$ %s compromete %s%% da renda, acima do limite permitido de %s%%.",
+            valorParcela.toPlainString(), percentualComprometimento.setScale(2, RoundingMode.HALF_UP).toPlainString(),
+            limitePercentual.setScale(2, RoundingMode.HALF_UP).toPlainString());
 
     SimulacaoCredito entidade = new SimulacaoCredito();
     entidade.setCpf(request.cpf());
@@ -128,10 +142,23 @@ public class SimulacaoService {
     log.info("[AUDIT] Simulação concluída e salva. ID: {}, Status: {}, Usuário: {}",
         salva.getId(), status, username);
 
-    return new SimulacaoResponse(
+    // Monta a resposta base (sem análise IA ainda)
+    SimulacaoResponse responseBase = new SimulacaoResponse(
         salva.getId(), CpfUtil.mascararCpf(salva.getCpf()), salva.getNome(), salva.getIdade(),
         salva.getRendaMensal(), salva.getValorSolicitado(), salva.getPrazoMeses(),
-        valorParcela, taxaJuros, salva.getStatus(), salva.getJustificativaIa(), salva.getDataSimulacao());
+        valorParcela, taxaJuros, salva.getStatus(), salva.getJustificativaIa(), salva.getDataSimulacao(),
+        null);
+
+    // Chama o Gemini para análise interpretativa
+    GeminiAnaliseResponse analiseIA = geminiService.analisarSimulacao(responseBase);
+
+    // Retorna a resposta enriquecida com a análise da IA
+    return new SimulacaoResponse(
+        responseBase.id(), responseBase.cpf(), responseBase.nome(), responseBase.idade(),
+        responseBase.rendaMensal(), responseBase.valorSolicitado(), responseBase.prazoMeses(),
+        responseBase.valorParcela(), responseBase.taxaJurosMensal(), responseBase.status(),
+        responseBase.justificativaIa(), responseBase.dataSimulacao(),
+        analiseIA);
   }
 
   private BigDecimal calcularParcelaPrice(BigDecimal valorPresente, BigDecimal taxaMensal, int numeroParcelas) {

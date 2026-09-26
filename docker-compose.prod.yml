@@ -54,13 +54,9 @@ services:
     networks:
       - simucred-net
 
-  # Front-end Angular (opcional - sobe apenas quando chamado com --profile full)
+  # Front-end Angular: imagem publicada pelo CD do simucred_web no Docker Hub
   web:
-    profiles: ["full"]
-    build:
-      context: ${WEB_PATH:-../simucred_web/simucred}
-      dockerfile: Dockerfile
-    image: simucred-web:local
+    image: alezzin/simucred-web:latest
     container_name: simucred-web
     ports:
       - "${WEB_PORT:-4200}:4000"

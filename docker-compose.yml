@@ -57,12 +57,14 @@ services:
     networks:
       - simucred-net
 
-  # Front-end Angular (repositório simucred_web, clonado ao lado deste).
-  # Fica no profile "full" para o CI da API continuar subindo só banco, Keycloak e API.
+  # Front-end Angular (repositório simucred_web).
+  # O CI da API sobe só "postgres keycloak api", então não depende do front.
   web:
-    profiles: ["full"]
     build:
-      context: ${WEB_PATH:-../simucred_web/simucred}
+      # Por padrão o front é construído direto do GitHub (branch main), sem precisar
+      # clonar o simucred_web. Para usar uma cópia local, defina WEB_PATH no .env
+      # (ex.: WEB_PATH=../simucred_web/simucred).
+      context: ${WEB_PATH:-https://github.com/Simucred/simucred_web.git#main:simucred}
       dockerfile: Dockerfile
     image: simucred-web:local
     container_name: simucred-web

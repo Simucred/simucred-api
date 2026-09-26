@@ -1,87 +1,184 @@
-# 🏦 Simucred — AI-Powered Credit Decision Engine
+# 💰 Simucred API — Sistema de Simulação de Crédito
 
-O **Simucred** é um sistema projetado para automatizar e validar o fluxo de aprovação de crédito. A plataforma utiliza um motor de regras de negócio determinístico para a tomada de decisão financeira e integra uma camada de Inteligência Artificial para gerar explicabilidade, transparência e recomendações aos usuários.
+![Java 21](https://img.shields.io/badge/Java-21-orange)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-brightgreen)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue)
+![Keycloak](https://img.shields.io/badge/Keycloak-24.0.5-purple)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED)
 
-A arquitetura do projeto foi estruturada para solucionar gargalos comuns no ciclo de vida do software, adotando um fluxo rigoroso de desenvolvimento, operações (DevOps) e governança.
+## 1. Descrição do Projeto
+O **Simucred API** é o serviço de back-end de uma plataforma de simulação e análise de operações de crédito. A aplicação permite realizar cálculos financeiros de propostas de empréstimo, consultar modalidades e taxas, validar regras de negócio de crédito e persistir o histórico de simulações realizadas pelos usuários.
 
-### 🧠 Recursos de Inteligência Artificial (AI Layer)
-A IA do Simucred atua **exclusivamente como uma camada de análise**, sem autoridade para aprovar ou reprovar operações (decisão mantida no motor de regras).
-- **1️⃣ AI Credit Explanation:** Traduz os resultados técnicos da simulação para linguagem natural, explicando os motivos exatos de uma aprovação ou reprovação (ex: limite de comprometimento de renda excedido).
-- **2️⃣ AI Alternative Loan:** Em caso de reprovação, analisa cálculos alternativos processados pelo backend e sugere propostas viáveis para o cliente (ex: aumentar o prazo para adequar a parcela à renda).
-- **3️⃣ AI Credit Insights:** Analisa o histórico de simulações do banco de dados e gera insights gerenciais sobre o comportamento de risco e taxas de conversão.
-
-### 🚀 Stack Tecnológica
-- **Backend & Regras de Negócio:** Java 21 + Spring Boot 3.2
-- **Frontend:** Angular 20+
-- **Persistência:** PostgreSQL com versionamento via Flyway
-- **Infraestrutura e CI/CD:** Docker, Docker Compose, GitHub Actions
-- **Qualidade e Segurança:** SonarCloud, Trivy
-- **Observabilidade:** Prometheus, Grafana
+A segurança da API é baseada no protocolo **OAuth2 / OpenID Connect (OIDC)** utilizando tokens **JWT** emitidos e validados pelo **Keycloak**, enquanto a persistência relacional é gerenciada pelo **PostgreSQL** com versionamento de schema automatizado.
 
 ---
 
-### ⚙️ Como executar o projeto localmente
+## 2. Arquitetura e Tecnologias Utilizadas
+* **Linguagem e Runtime:** Java 21 (Eclipse Temurin)
+* **Framework Back-end:** Spring Boot 3 (Spring Web, Spring Data JPA, Spring Security OAuth2 Resource Server, Spring Boot Actuator)
+* **Banco de Dados:** PostgreSQL 16 (`postgres:16-alpine`)
+* **Identidade e Autenticação (IAM):** Keycloak 24.0.5 (`quay.io/keycloak/keycloak:24.0.5`) com importação automática de Realm (`realm-export.json`)
+* **Gerenciador de Dependências e Build:** Apache Maven (via Maven Wrapper `./mvnw`)
+* **Testes Automatizados:** JUnit 5 e Spring Boot Test
+* **Containerização e Orquestração:** Docker (Multi-Stage Build) e Docker Compose
+* **CI/CD:** GitHub Actions com publicação automatizada no Docker Hub
 
-**Pré-requisitos:**
-- Docker e Docker Compose instalados
-- Os dois repositórios clonados **lado a lado** na mesma pasta:
+### Topologia dos Containers (`simucred-net`)
+1. **`simucred-db` (PostgreSQL 16):** Banco de dados isolado na rede interna (`5432/tcp`), com volume nomeado (`postgres_data`) para persistência de dados e `healthcheck` nativo (`pg_isready`).
+2. **`simucred-keycloak` (Keycloak 24):** Servidor de autorização que importa automaticamente o realm `simucred` na inicialização (`--import-realm`), exposto na porta `8081`.
+3. **`simucred-api` (Spring Boot):** API RESTful executada sob usuário não-root (`appuser`), aguardando a saúde do banco (`service_healthy`) e exposta na porta `8080`.
+4. **`simucred-web` (Angular):** Aplicação front-end consumidora da API e do Keycloak, exposta na porta `4200`.
 
-```text
-pasta-qualquer/
-├── simucred-api/   ← este repositório (tem o docker-compose.yml)
-└── simucred_web/   ← front-end Angular
-```
+---
+
+## 3. Pré-requisitos
+Para executar o projeto via containers, você precisa apenas de:
+* **Docker** (v24.0 ou superior)
+* **Docker Compose** (v2.20 ou superior)
+* **Git**
+
+*(Opcional para execução fora do Docker)*:
+* **JDK 21** instalado e configurado no `PATH`.
+
+---
+
+## 4. Como Executar com Docker Compose (Build Local)
+O projeto foi configurado com valores padrão (*fallback*) em todas as variáveis de ambiente. Isso garante que o ambiente completo suba com **um único comando**, mesmo sem a criação manual prévia de um arquivo `.env`:
 
 ```bash
+# 1. Clone o repositório
 git clone https://github.com/Simucred/simucred-api.git
-git clone https://github.com/Simucred/simucred_web.git
+cd simucred-api
+
+# 2. Suba tudo (Banco + Keycloak + API + Front-end) construindo as imagens localmente
+docker compose up -d --build
+
+# 3. Verifique o estado e a saúde (healthy) dos containers
+docker compose ps
 ```
 
-**1. Criar o arquivo `.env`**
-Na raiz deste repositório, copie o modelo. Os valores padrão já funcionam para rodar localmente:
+Os 4 serviços sobem juntos. O front-end é construído **direto do repositório [`simucred_web`](https://github.com/Simucred/simucred_web)** no GitHub (branch `main`), sem precisar cloná-lo. Para construir o front a partir de uma cópia local, defina `WEB_PATH` no `.env` (ex.: `WEB_PATH=../simucred_web/simucred`).
+
+### Acessando a aplicação
+Abra http://localhost:4200. Na tela de login do Keycloak, clique em **Register** para criar um usuário (o cadastro está liberado no realm `simucred`, importado automaticamente de `keycloak/realm-export.json`).
+
+### Comandos Úteis de Gerenciamento
+```bash
+# Visualizar os logs da API em tempo real
+docker compose logs -f api
+
+# Parar e remover os containers mantendo os dados salvos no volume do banco
+docker compose down
+
+# Parar os containers e APAGAR o volume do banco (útil ao trocar senhas no .env)
+docker compose down -v
+```
+
+---
+
+## 5. Como Executar a Imagem Publicada no Docker Hub (Produção)
+As imagens oficiais validadas pelos pipelines de CI/CD estão publicadas publicamente no Docker Hub:
+
+| Serviço | Imagem | Publicada por |
+| --- | --- | --- |
+| API | [`alezzin/simucred-api:latest`](https://hub.docker.com/r/alezzin/simucred-api) | CD deste repositório |
+| Front-end | [`alezzin/simucred-web:latest`](https://hub.docker.com/r/alezzin/simucred-web) | CD do repositório `simucred_web` |
+
+Para executar o ambiente utilizando diretamente as imagens prontas (sem compilar nada localmente), utilize o arquivo `docker-compose.prod.yml`:
+
+```bash
+# 1. Baixar as imagens diretamente do Docker Hub (teste de visibilidade pública)
+docker pull alezzin/simucred-api:latest
+docker pull alezzin/simucred-web:latest
+
+# 2. Subir o ambiente completo utilizando a imagem publicada
+docker compose -f docker-compose.prod.yml up -d
+
+# 3. Verificar os containers em execução
+docker compose -f docker-compose.prod.yml ps
+
+# 4. Encerrar o ambiente
+docker compose -f docker-compose.prod.yml down
+```
+
+---
+
+## 6. Endpoints Principais e Verificação de Saúde
+Após iniciar os containers, aguarde cerca de 20 a 30 segundos e valide os serviços nos seguintes endereços:
+
+* **Healthcheck da API (Spring Boot Actuator):**
+  * URL: `http://localhost:8080/actuator/health`
+  * Resposta esperada: `{"status":"UP"}`
+* **API Base URL:** `http://localhost:8080/v1`
+* **Keycloak Admin Console:** `http://localhost:8081`
+* **Keycloak Realm Endpoint (Importado Automaticamente):** `http://localhost:8081/realms/simucred`
+* **Front-end Web:** `http://localhost:4200`
+
+---
+
+## 7. Como Executar os Testes Automatizados
+Os testes unitários e de integração foram desenvolvidos com **JUnit 5**. Para executá-los localmente utilizando o Maven Wrapper (que garante a versão exata do Maven sem exigir instalação global):
+
+```bash
+# No Linux / macOS
+./mvnw clean test
+
+# No Windows (PowerShell / CMD)
+.\mvnw.cmd clean test
+```
+
+---
+
+## 8. Variáveis de Ambiente
+Nenhuma credencial sensível ou senha pessoal está fixa (*hardcoded*) na imagem Docker ou no código-fonte. O projeto disponibiliza o arquivo `.env.example` versionado na raiz como modelo.
+
+Caso deseje customizar portas ou credenciais localmente, crie uma cópia chamada `.env` (que é ignorada pelo Git via `.gitignore`):
 
 ```bash
 cp .env.example .env
 ```
 
-No Windows (PowerShell/CMD): `copy .env.example .env`
-
-**2. Subir tudo (banco, Keycloak, API e front) com um comando**
-```bash
-docker compose up -d --build
-```
-
-A ordem de subida é automática: o Postgres precisa ficar `healthy` antes da API subir, e o front sobe depois da API.
-
-**3. Conferir**
-```bash
-docker compose ps
-```
-
-Os 4 serviços devem aparecer como `Up`.
-
-| Serviço | Endereço |
-| --- | --- |
-| Front-end | http://localhost:4200 |
-| API | http://localhost:8080 (Swagger em `/swagger-ui.html`) |
-| Keycloak | http://localhost:8081 (painel admin com `KEY_USER` / `KEY_PASSWORD`) |
-
-**4. Acessar**
-Abra http://localhost:4200 e entre com o usuário de teste `analista` / `123456`, ou clique em **Register** na tela do Keycloak para criar um usuário.
-
-> O realm `simucred`, o client `simucred-web` e o usuário de teste são importados de `keycloak/realm-export.json` na primeira subida. Essas credenciais são **apenas para desenvolvimento local**.
-
-**Parar os serviços**
-```bash
-docker compose stop      # pausa, mantendo dados e usuários
-docker compose down -v   # remove tudo, inclusive o banco
-```
-
-**Subir só o backend (sem o front)**
-O front faz parte do profile `full`, ativado pela linha `COMPOSE_PROFILES=full` do `.env`. Remova essa linha para subir apenas banco, Keycloak e API (é assim que o CI roda).
-
-**Portas ocupadas?** Troque `API_PORT`, `KEY_PORT` e/ou `WEB_PORT` no `.env`. O front é configurado automaticamente para as novas portas.
-
-**Atualizou e o banco não sobe?** Se aparecer `database files are incompatible` no log do `simucred-db`, o volume foi criado com uma versão anterior do PostgreSQL. Rode `docker compose down -v` e suba de novo (os dados locais são apagados).
+| Variável | Descrição | Valor Padrão (`.env.example`) |
+| :--- | :--- | :--- |
+| `DB_HOST` | Host do banco de dados na rede interna do Docker Compose | `postgres` |
+| `DB_PORT` | Porta interna do banco de dados PostgreSQL | `5432` |
+| `DB_NAME` | Nome do banco de dados criado na inicialização | `simucred` |
+| `DB_USER` | Usuário de autenticação do banco de dados | `postgres` |
+| `DB_PASSWORD` | Senha de autenticação do banco de dados | `postgrespassword` |
+| `KEY_USER` | Usuário administrador do console do Keycloak | `admin` |
+| `KEY_PASSWORD` | Senha do administrador do Keycloak | `admin` |
+| `KEY_PORT` | Porta exposta no host para acesso ao Keycloak | `8081` |
+| `KEY_REALM` | Nome do Realm OAuth2/OIDC importado no Keycloak | `simucred` |
+| `KEY_CLIENT_ID` | Client ID configurado no Keycloak para o front-end | `simucred-web` |
+| `API_PORT` | Porta exposta no host para acesso à API Spring Boot | `8080` |
+| `WEB_PORT` | Porta exposta no host para o front-end Angular | `4200` |
+| `WEB_PATH` | (Opcional) Contexto de build do front-end. Padrão: repositório `simucred_web` no GitHub (branch `main`) | `../simucred_web/simucred` |
 
 ---
+
+## 9. Pipeline de CI/CD (GitHub Actions)
+O fluxo de Integração e Entrega Contínua está definido em `.github/workflows/ci_cd.yml`, dividido em dois jobs estritamente separados e integrados ao cofre de **GitHub Secrets**:
+
+### Etapa 1: `ci` (Integração Contínua)
+Disparada automaticamente em qualquer `push` nas branches de trabalho (`dev`, `main`, `infra/**`, `feature/**`, `fix/**`, `test/**`) e em abertura de `Pull Requests` para `dev` e `main`:
+1. **Checkout e Setup do JDK 21** (Eclipse Temurin com cache de dependências do Maven).
+2. **Execução dos Testes Automatizados (`./mvnw clean test`):** Valida as regras de negócio utilizando um container de serviço `postgres:16-alpine` efêmero configurado com *GitHub Secrets*.
+3. **Build Único da Imagem Docker:** Constrói a imagem `app:${{ github.sha }}` a partir do `Dockerfile`.
+4. **Validação Real com Docker Compose:** Executa `docker compose up -d` no runner do GitHub Actions, aguarda a subida dos containers, inspeciona os logs e valida se o container `simucred-api` permanece em estado `Running` e saudável.
+5. **Exportação do Artefato (Regra de Ouro):** Salva a imagem validada em arquivo binário (`docker save --output imagem.tar`) e faz upload como artefato (`imagem-docker-validada`) para garantir que o job de CD não reconstrua a imagem do zero.
+
+### Etapa 2: `cd` (Entrega Contínua)
+Executada **exclusivamente após o sucesso do job de CI** (`needs: ci`) e **somente em eventos de `push` (merge) na branch principal `main`**:
+1. Faz o download do artefato `imagem-docker-validada` gerado no CI.
+2. Carrega exatamente os mesmos bytes da imagem testada via `docker load --input imagem.tar`.
+3. Autentica no Docker Hub utilizando os segredos `DOCKERHUB_USERNAME` e `DOCKERHUB_TOKEN`.
+4. Aplica as tags `:latest` e `:${{ github.sha }}` e publica a imagem em `alezzin/simucred-api`.
+
+---
+
+## 10. Boas Práticas de Containerização e Segurança Aplicadas
+* **Multi-Stage Build no `Dockerfile`:** O primeiro estágio (`maven:3.9.6-eclipse-temurin-21-alpine`) baixa as dependências em camada separada para aproveitar o cache e compila o `.jar`; o estágio final (`eclipse-temurin:21-jre-alpine`) contém apenas o JRE enxuto e o artefato compilado, reduzindo drasticamente a superfície de ataque e o tamanho final da imagem.
+* **Arquivo `.dockerignore`:** Impede que a pasta `.git`, artefatos locais (`target/`), arquivos de documentação e arquivos `.env` sejam enviados ao contexto de build da imagem.
+* **Execução com Usuário Não-Root:** Criação do grupo `appgroup` e usuário `appuser` no estágio final do `Dockerfile` (`USER appuser`), garantindo que o processo Java não rode com privilégios de `root`.
+* **Healthcheck Nativo na Imagem e no Compose:** O `Dockerfile` monitora periodicamente o endpoint `/actuator/health` via `wget`, e o `docker-compose.yml` utiliza `condition: service_healthy` para orquestrar a ordem correta de inicialização entre o PostgreSQL e a API.
+* **Isolamento de Rede e Persistência:** Os containers comunicam-se internamente por nome de serviço (`postgres`, `keycloak`, `api`) através da rede bridge dedicada `simucred-net`, sem expor a porta do banco de dados desnecessariamente no host, mantendo os dados íntegros no volume nomeado `postgres_data`.

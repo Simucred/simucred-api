@@ -26,22 +26,5 @@
         "post.logout.redirect.uris": "http://localhost:4200/*"
       }
     }
-  ],
-  "users": [
-    {
-      "username": "analista",
-      "enabled": true,
-      "emailVerified": true,
-      "firstName": "Analista",
-      "lastName": "SimuCred",
-      "email": "analista@simucred.com",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "123456",
-          "temporary": false
-        }
-      ]
-    }
   ]
 }

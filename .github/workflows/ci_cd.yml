@@ -63,7 +63,8 @@ jobs:
           KEY_USER: ${{ secrets.KEY_USER }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          docker compose up -d
+          # Sobe só o backend: o front é validado no pipeline do simucred_web
+          docker compose up -d postgres keycloak api
           sleep 25
           docker compose ps
           docker logs simucred-api
