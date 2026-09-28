@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: simucred-db
+    container_name: ${CONTAINER_PREFIX:-simucred}-db
     environment:
       POSTGRES_DB: ${DB_NAME:-simucred}
       POSTGRES_USER: ${DB_USER:-postgres}
@@ -18,7 +18,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:24.0.5
-    container_name: simucred-keycloak
+    container_name: ${CONTAINER_PREFIX:-simucred}-keycloak
     command: start-dev --import-realm
     environment:
       KEYCLOAK_ADMIN: ${KEY_USER:-admin}
@@ -32,8 +32,9 @@ services:
       - simucred-net
 
   api:
-    image: alezzin/simucred-api:latest
-    container_name: simucred-api
+    # O deploy do CD informa a tag exata publicada (API_IMAGE=alezzin/simucred-api:<sha>)
+    image: ${API_IMAGE:-alezzin/simucred-api:latest}
+    container_name: ${CONTAINER_PREFIX:-simucred}-api
     ports:
       - "${API_PORT:-8080}:8080"
     environment:
@@ -57,7 +58,7 @@ services:
   # Front-end Angular: imagem publicada pelo CD do simucred_web no Docker Hub
   web:
     image: alezzin/simucred-web:latest
-    container_name: simucred-web
+    container_name: ${CONTAINER_PREFIX:-simucred}-web
     ports:
       - "${WEB_PORT:-4200}:4000"
     environment:
